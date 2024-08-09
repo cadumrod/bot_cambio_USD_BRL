@@ -12,6 +12,11 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.shared import RGBColor, Pt, Cm
 from hyperlink import add_hyperlink
 from time import sleep
+from docx2pdf import convert
+import os
+import platform
+import ctypes
+from ctypes import wintypes
 
 
 ##################################  Config Selenium  ##################################
@@ -43,6 +48,36 @@ def iniciar_driver():
     )
 
     return driver, wait
+
+
+##################################  Padronizando path da Área de trabalho  ##################################
+
+# Definir o diretório da área de trabalho do usuário de forma compatível com diferentes sistemas operacionais para output de arquivos
+def get_desktop_path():
+    if platform.system() == "Windows":
+        # Windows: Usar SHGetFolderPathW para encontrar a área de trabalho
+        CSIDL_DESKTOP = 0x0000       # Pasta da área de trabalho
+        SHGFP_TYPE_CURRENT = 0       # Pegar atual, não valor padrão
+
+        buf = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
+        ctypes.windll.shell32.SHGetFolderPathW(
+            None, CSIDL_DESKTOP, None, SHGFP_TYPE_CURRENT, buf)
+        return buf.value
+
+    elif platform.system() == "Darwin":
+        # macOS: Caminho padrão para a área de trabalho
+        return os.path.join(os.path.expanduser("~"), "Desktop")
+
+    elif platform.system() == "Linux":
+        # Linux: Caminho padrão para a área de trabalho
+        return os.path.join(os.path.expanduser("~"), "Área de Trabalho")
+
+    else:
+        raise Exception("Sistema Operacional não suportado.")
+
+
+# Obter o caminho da área de trabalho
+desktop_dir = get_desktop_path()
 
 
 ##################################  Execução do app  ##################################
@@ -78,15 +113,19 @@ data = datetime.strftime(datetime.now(), "%d/%m/%Y")
 # Link de onde foi extraída a cotação
 link_cotacao = driver.current_url
 
-# Print em resolução 1920 x 1080
-driver.save_screenshot("cotacao.png")
+# Caminho completo para salvar o arquivo .png
+output_file = os.path.join(desktop_dir, 'cotacao.png')
 
-# Encerrando conexão
+# Print em resolução 1920 x 1080
+driver.save_screenshot(output_file)
+
+# Encerrar conexão
 driver.quit()
 
-
-print("Dados obtidos! Criando arquivo em formato .docx...")
+print("\nDados obtidos! Criando arquivo em formato .docx...")
 sleep(1.5)
+
+
 ##################################  Criação do .docx  ##################################
 # Criar documento docx
 doc = Document()
@@ -136,7 +175,7 @@ run_paragrafo_5.font.name = 'Liberation Serif'
 # Adicionando print como imagem
 paragrafo_imagem = doc.add_paragraph()
 run_imagem = paragrafo_imagem.add_run()
-run_imagem.add_picture("cotacao.png", width=Cm(15))
+run_imagem.add_picture(output_file, width=Cm(15))
 paragrafo_imagem.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
 # Autor da cotacao
@@ -154,8 +193,29 @@ run_autor2.italic = True
 run_autor2.bold = True
 
 # Salvar o documento
-doc.save('cotacao.docx')
+doc.save(os.path.join(desktop_dir, 'cotacao.docx'))
 
 # Encerrando criação de docx
 sleep(1)
 print("Arquivo docx pronto!")
+sleep(1)
+
+
+##################################  Conversão de .docx para .pdf  ##################################
+print("Realizando conversão para .pdf...")
+sleep(1)
+
+convert(os.path.join(desktop_dir, 'cotacao.docx'))
+sleep(1)
+
+print("Conversão realizada com sucesso!")
+sleep(1)
+
+##################################  Encerramento do app  ##################################
+print("Os arquivos foram salvos na sua Área de trabalho!")
+sleep(1.5)
+print("Encerrando em...")
+for i in range(3, 0, -1):
+    print(i)
+    sleep(1)
+os._exit(0)
